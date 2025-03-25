@@ -185,7 +185,6 @@ global_css = """
 # Store CSS in session state (ensures inheritance across pages)
 st.session_state["global_css"] = global_css
 
-
 # Apply CSS in main app
 st.markdown(global_css, unsafe_allow_html=True)
 
@@ -202,8 +201,6 @@ if "form_models" not in st.session_state:
     st.session_state.form_models = ""
 if "models_input" not in st.session_state:
     st.session_state.models_input = ""
-if "generate_thumbnails" not in st.session_state:
-    st.session_state.generate_thumbnails = False
 
 # Function to check if credentials are stored in session state
 def credentials_exist():
@@ -291,14 +288,11 @@ else:
             value=st.session_state.get("form_models", ""),
             help="Enter each model on a new line in the format: ModelName|ModelURL"
         )
-        gen_thumbnails = st.checkbox("Generate thumbnails for inputs", value=st.session_state.generate_thumbnails, help="Generate thumbnails for inputs. Disable for faster loading.")
+
         download_config = st.checkbox("Download configuration after submission", value=False)
         submitted = st.form_submit_button("Validate")
 
     # Add these key handlers
-    def update_thumbnails():
-        st.session_state.generate_thumbnails = gen_thumbnails
-
     def update_pat():
         st.session_state.form_pat = st.session_state.pat_input
 
@@ -380,7 +374,6 @@ else:
         st.session_state["clarifai_base_url"] = st.session_state.base_url_input
         st.session_state["models"] = models
         st.session_state["validation_complete"] = True
-        st.session_state["generate_thumbnails"] = gen_thumbnails
         
         st.success("Configuration validated successfully!")
 
