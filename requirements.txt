@@ -3,14 +3,10 @@ clarifai==11.0.7
 imageio-ffmpeg==0.6.0
 imageio==2.37.0
 numpy==2.2.2
-opencv-python-headless==4.11.0.86
+opencv-python==4.11.0.86
 st-clickable-images==0.0.3
 streamlit==1.41.1
 cryptography>=42.0.0
 backoff>=2.2.1
 urllib3>=2.0.0
-klvdata>=0.0.3
-psutil
-backoff
-grpcio
-cryptography
+
