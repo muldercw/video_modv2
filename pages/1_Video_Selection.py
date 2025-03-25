@@ -45,9 +45,7 @@ def manual_input_form():
             st.session_state.manual_urls = urls_text.strip()
             return True
     return False
-def generate_id():
-   #use hex to generate id
-   return hex(int(time.time()))[2:]
+
 def create_mock_inputs(urls_text):
     """Create mock inputs from URLs text."""
     urls = [url.strip() for url in urls_text.splitlines() if url.strip()]
@@ -58,8 +56,7 @@ def create_mock_inputs(urls_text):
             "id": f"manual_input_{i}",
             "data": {
                 "metadata": {
-                    "stream_url": url,
-                    "asset_name": generate_id()
+                    "stream_url": url
                 }
             }
         }
@@ -167,7 +164,6 @@ app_id = st.session_state["clarifai_app_id"]
 base_url = st.session_state["clarifai_base_url"]
 root_certificates_path = st.session_state["clarifai_root_certificates_path"]
 models = st.session_state["models"]
-generate_thumbnails = st.session_state.get("generate_thumbnails", False)
 
 # Initialize page number in session state if not exists
 if 'page_no' not in st.session_state:
@@ -183,7 +179,6 @@ def detect_video_type(video_url):
     print("RTSP stream detected.")
     return "rtsp"  # Use FFmpeg
   elif video_url.endswith(".mp4"):
-    print("MP4 file detected.")
     return "mp4"  # Use OpenCV first, FFmpeg only if necessary
   elif re.match(r'http[s]?://', video_url):
     print("HTTP/HTTPS stream detected.")
@@ -208,7 +203,6 @@ def get_bright_frame(video_url, brightness_threshold=50, max_attempts=25):
       "-probesize", "32",
       "-analyzeduration", "0",
       "-i", video_url,
-      "-map", "0:0",
       "-flags", "low_delay",
       "-strict", "experimental",
       "-frames:v", "1",
@@ -315,22 +309,6 @@ def to_base64_data_url(image_bytesio):
   return f"data:image/png;base64,{base64_str}"
 
 
-def get_optimal_font_scale(text, width, font=cv2.FONT_HERSHEY_SIMPLEX, thickness=2, padding=20, max_scale=2.5):
-    """Find the largest font scale that fits within the image width while considering padding."""
-    max_width = width - (2 * padding)  # Available width after padding
-    best_scale = 1  # Default scale
-
-    for scale in reversed(range(1, 100)):  # Try scales from 10.0 to 0.1
-        scale = scale / 10
-        text_size = cv2.getTextSize(text, font, scale, thickness)[0]
-        if text_size[0] <= max_width:
-            best_scale = scale
-            break  # Stop at the first fitting size
-
-    return min(best_scale, max_scale)  # Limit max font scale
-
-
-
 # Function to process a single input (wrapper for multithreading)
 def process_input(inp):
     """Processes a single input by extracting a bright frame and returning relevant metadata."""
@@ -339,34 +317,13 @@ def process_input(inp):
         if isinstance(inp, dict):
             # For manual/mock inputs
             meta_stream_url = inp["data"]["metadata"]["stream_url"]
-            asset_name = inp["data"]["metadata"]["asset_name"]
             input_id = inp["id"]
         else:
             # For Clarifai inputs
             meta_stream_url = inp.data.metadata['stream_url']
-            asset_name = inp.data.metadata['asset_name']
             input_id = inp.id
-        
-        if generate_thumbnails == True:
-           bright_frame = get_bright_frame(meta_stream_url)  # Extract bright frame
-           img_height, img_width = bright_frame.shape[:2]
-           padding = int(img_width * 0.10)
-           font_scale = get_optimal_font_scale(asset_name, img_width, padding=padding, max_scale=1.5)
-           text_size = cv2.getTextSize(asset_name, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)[0]
-           text_x = (img_width - text_size[0]) // 2
-           text_y = (img_height + text_size[1]) // 2  
-           cv2.putText(bright_frame, asset_name, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), 2, cv2.LINE_AA)
 
-        else:
-           bright_frame = cv2.imread('assets/default_thumbnail.png')
-           img_height, img_width = bright_frame.shape[:2]
-           padding = int(img_width * 0.10)
-           font_scale = get_optimal_font_scale(asset_name, img_width, padding=padding, max_scale=1.5)
-           text_size = cv2.getTextSize(asset_name, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)[0]
-           text_x = (img_width - text_size[0]) // 2
-           text_y = (img_height + text_size[1]) // 2  
-           cv2.putText(bright_frame, asset_name, (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 0, 0), 2, cv2.LINE_AA)
-                    
+        bright_frame = get_bright_frame(meta_stream_url)  # Extract bright frame
 
         if bright_frame is not None:
             h, w, _ = bright_frame.shape  # Extract the original size
