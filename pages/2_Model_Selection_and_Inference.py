@@ -12,7 +12,7 @@ import cv2
 
 logger = logging.getLogger(__name__)
 
-# Initialize video settings
+
 if 'video_settings' not in st.session_state:
     st.session_state.video_settings = {
         'use_stream': False,
@@ -28,7 +28,6 @@ if 'video_settings' not in st.session_state:
         'prediction_reuse_frames': 2
     }
 
-# Initialize other required state
 if 'processing_stats' not in st.session_state:
     st.session_state.processing_stats = {
         'fps': 0,
@@ -39,31 +38,27 @@ if 'processing_stats' not in st.session_state:
 if 'detection_log' not in st.session_state:
     st.session_state.detection_log = []
 
-# Check for required session state variables
 required_keys = [
     "clarifai_pat",
     "clarifai_user_id",
     "clarifai_app_id",
     "clarifai_base_url",
     "models",
-    "selected_video",  # Additional required keys for this page
+    "selected_video",
     "selected_input_id"
 ]
 
-# Check if all required keys exist in session state
 if not all(key in st.session_state for key in required_keys):
     st.error("Please start from the home page and select a video first.")
     st.stop()
-    st.switch_page("app.py")  # Redirect to main page
+    st.switch_page("app.py")  
 
-# from clarifai.client.auth.helper import ClarifaiAuthHelper
 from clarifai.client.input import Inputs
 from clarifai.client.model import Model
 from clarifai.utils.logging import logger
 from concurrent import futures
-from queue import Queue, Empty  # Add Empty here
+from queue import Queue, Empty
 from utils import footer
-
 import cv2
 import imageio_ffmpeg
 import numpy as np
@@ -93,40 +88,28 @@ def check_authentication():
         st.stop()
 
 check_authentication()
-
-# Apply global CSS (retrieved from session state)
 if "global_css" in st.session_state:
   st.markdown(st.session_state["global_css"], unsafe_allow_html=True)
-
-#st.title("🔍 Video Processing")
-
 
 def modelhash(model):
   return model["Name"] + " (" + model["URL"] + ")"
 
-# Configuration toggles
-USE_STREAM = False  # if false then it does predict calls which can be in parallel
+
+USE_STREAM = False 
 ENABLE_FPS_SYNC = True
-THREADS = 8  # only used when USE_STREAM is False
-
+THREADS = 8 
 ENABLE_DRAW_PREDICTIONS = True
-FRAME_SKIP_INTERVAL = 3  # Reduced from 4 to 3 for smoother appearance
-RESIZE_SIZE = (0.25, 0.25)  # Process at 25% of original size for better performance
-MAX_QUEUE_SIZE = 120  # Increased buffer for smoother playback
-PREDICTION_TIMEOUT = 1.0  # Reduced timeout to prevent stalling
-BUFFER_SIZE = 30  # Increased buffer size
-DISPLAY_DELAY = 0.033  # ~30 FPS (1/30 ≈ 0.033)
-PREDICTION_REUSE_FRAMES = 3  # Reuse predictions for this many frames
-# st.session_state.selected_input_id = "mXqSMCXTd8zFTBiL"
-# st.session_state.selected_video = "https://videos.pexels.com/video-files/2796077/2796077-hd_1280_720_25fps.mp4"
-# st.info("HARDCODED VIDEO: " + st.session_state.selected_video)
+FRAME_SKIP_INTERVAL = 3 
+RESIZE_SIZE = (0.25, 0.25)
+MAX_QUEUE_SIZE = 120 
+PREDICTION_TIMEOUT = 1.0 
+BUFFER_SIZE = 30 
+DISPLAY_DELAY = 0.033
+PREDICTION_REUSE_FRAMES = 3 
 
-# Check if a video is selected
 if "selected_video" not in st.session_state or not st.session_state.selected_video:
   st.warning("No video selected. Please select a video from the 'Video Selection' page.")
   st.stop()
-
-# Initialize video settings if not already present
 if 'video_settings' not in st.session_state:
     st.session_state.video_settings = {
         'use_stream': False,
@@ -141,8 +124,6 @@ if 'video_settings' not in st.session_state:
         'target_fps': 30,
         'prediction_reuse_frames': 2
     }
-
-# Initialize processing stats if not present
 if 'processing_stats' not in st.session_state:
     st.session_state.processing_stats = {
         'fps': 0,
@@ -150,28 +131,19 @@ if 'processing_stats' not in st.session_state:
         'queue_size': 0
     }
 
-# Initialize detection log if not present
 if 'detection_log' not in st.session_state:
     st.session_state.detection_log = []
 
-# Then define your constants
 MAX_QUEUE_SIZE = st.session_state.video_settings['max_queue_size']
 PREDICTION_TIMEOUT = st.session_state.video_settings['prediction_timeout']
 BUFFER_SIZE = st.session_state.video_settings['buffer_size']
 DISPLAY_DELAY = 1.0 / st.session_state.video_settings['target_fps']
 PREDICTION_REUSE_FRAMES = st.session_state.video_settings['prediction_reuse_frames']
 
-# Add to the session state initialization section at the top
+
 if 'detection_display_enabled' not in st.session_state:
     st.session_state.detection_display_enabled = False
 
-# Retrieve Clarifai Authentication from session state
-# if 'auth' not in st.session_state:
-#   st.session_state.auth = ClarifaiAuthHelper.from_streamlit(st)
-  # st.error("Authentication not initialized. Please go back to the Video Selection page.")
-  # st.stop()
-
-# auth = st.session_state.auth
 pat = st.session_state["clarifai_pat"]
 base_url = st.session_state["clarifai_base_url"]
 root_certificates_path = st.session_state["clarifai_root_certificates_path"]
@@ -183,7 +155,6 @@ if 'stop_processing' not in st.session_state:
 if 'processing_stats' not in st.session_state:
   st.session_state.processing_stats = {}
 
-# Display Selected Input ID and Thumbnail
 st.markdown(
     f"""
     <div style="margin-bottom: -8px;">
@@ -196,26 +167,21 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Model Selection Dropdown
 model_names = [modelhash(model) for model in models]
 selected_model_name = st.selectbox("Select a Model", model_names)
 selected_model_url = next(
     model for model in models if modelhash(model) == selected_model_name
 )
 
-# Create two columns - one for video, one for detection log
 video_col, log_col = st.columns([0.7, 0.3])
 
 with video_col:
-    # Create two columns for the video and metrics
-    frame_placeholder = video_container = st.empty()  # For the video frame
-    metrics_cols = st.columns(3)  # For the performance metrics
-    
-    # Display initial thumbnail if available
+    frame_placeholder = video_container = st.empty() 
+    metrics_cols = st.columns(3)  
+
     if "selected_thumbnail" in st.session_state:
         frame_placeholder.image(st.session_state.selected_thumbnail, channels="RGB")
     
-    # Display performance metrics below the video
     if st.session_state.get('processing_stats'):
         with metrics_cols[0]:
             st.metric("FPS", f"{st.session_state.processing_stats.get('fps', 0):.1f}")
@@ -224,7 +190,7 @@ with video_col:
         with metrics_cols[2]:
             st.metric("Queue", st.session_state.processing_stats.get('queue_size', 0))
     
-    # Add custom CSS for compact buttons
+
     st.markdown("""
         <style>
         .compact-buttons .stButton > button {
@@ -236,21 +202,19 @@ with video_col:
         </style>
     """, unsafe_allow_html=True)
     
-    # Main control buttons in a more compact layout
     with st.container():
         st.markdown('<div class="compact-buttons">', unsafe_allow_html=True)
-        control_cols = st.columns([1, 1, 1, 3])  # The last column is empty for spacing
+        control_cols = st.columns([1, 1, 1, 3])  
         
         with control_cols[0]:
-            start_button = st.button("🚀 Start", use_container_width=True)
+            start_button = st.button("Start", use_container_width=True)
         with control_cols[1]:
-            stop_button = st.button("⏹ Stop", use_container_width=True)
+            stop_button = st.button("Stop", use_container_width=True)
         with control_cols[2]:
-            exit_button = st.button("❌ Exit", use_container_width=True)
+            exit_button = st.button("Exit", use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 with log_col:
-    # Custom CSS for the detection log
     st.markdown("""
         <style>
         .detection-log {
@@ -268,16 +232,12 @@ with log_col:
     """, unsafe_allow_html=True)
     
     st.markdown("### Detection Log")
-    
-    # Add enable/disable toggle at the top
     detection_display_enabled = st.toggle(
         "Enable Live Updates",
         value=st.session_state.detection_display_enabled,
         help="Toggle live updates of detections. Disable for better video performance."
     )
     st.session_state.detection_display_enabled = detection_display_enabled
-    
-    # Controls in columns
     col1, col2 = st.columns(2)
     with col1:
         min_confidence = st.slider("Min Confidence", 0.0, 1.0, 0.5, 0.1)
@@ -292,33 +252,26 @@ with log_col:
     
     if st.button("Clear Log", use_container_width=True):
         st.session_state.detection_log = []
-
-    # Create a container for the log with custom styling
     log_container = st.container()
 
     def update_detection_log():
         if not st.session_state.detection_display_enabled:
             return
-        
-        # Filter log entries based on confidence and search term
         filtered_log = [
             entry for entry in st.session_state.detection_log
             if entry["confidence"] >= min_confidence and
             (search_term.lower() in entry["label"].lower() or not search_term)
         ]
 
-        # Sort based on selected criteria
         if sort_by == "Time":
             filtered_log.sort(key=lambda x: x["timestamp"], reverse=(sort_order == "Descending"))
         elif sort_by == "Confidence":
             filtered_log.sort(key=lambda x: x["confidence"], reverse=(sort_order == "Descending"))
-        else:  # Label
+        else:  
             filtered_log.sort(key=lambda x: x["label"], reverse=(sort_order == "Descending"))
 
-        # Take only the last 10 entries
         display_log = filtered_log[:10]
         total_entries = len(filtered_log)
-
         with log_container:
             st.markdown('<div class="detection-log">', unsafe_allow_html=True)
             if not st.session_state.detection_display_enabled:
@@ -326,7 +279,6 @@ with log_col:
             else:
                 st.markdown(f"<small>Showing {len(display_log)} of {total_entries} detections</small>", unsafe_allow_html=True)
                 st.markdown("<hr>", unsafe_allow_html=True)
-                
                 for detection in display_log:
                     confidence = detection["confidence"]
                     confidence_color = (
@@ -344,9 +296,7 @@ with log_col:
                     """)
             st.markdown('</div>', unsafe_allow_html=True)
 
-# Add settings sidebar
 with st.sidebar:
-    # Add Clarifai logo at the top using local PNG image
     logo_path = os.path.join("assets", "clarifai_logo.png")
     try:
         logo_base64 = get_base64_encoded_image(logo_path)
@@ -359,10 +309,9 @@ with st.sidebar:
         """, unsafe_allow_html=True)
     except FileNotFoundError:
         st.warning("Clarifai logo not found in assets directory")
-    
+
     st.header("Video Processing Settings")
-    
-    # Basic Settings
+
     st.subheader("Basic Settings")
     st.session_state.video_settings['use_stream'] = st.toggle(
         "Use Streaming Mode",
@@ -383,8 +332,7 @@ with st.sidebar:
         value=st.session_state.video_settings['target_fps'],
         help="Target frames per second for display"
     )
-    
-    # Advanced Settings Expander
+
     with st.expander("Advanced Settings"):
         col1, col2 = st.columns(2)
         
@@ -439,8 +387,7 @@ with st.sidebar:
                 value=st.session_state.video_settings['prediction_reuse_frames'],
                 help="Reuse predictions for N frames"
             )
-    
-    # Performance Presets
+   
     st.subheader("Performance Presets")
     preset = st.selectbox(
         "Quick Settings",
@@ -476,7 +423,7 @@ with st.sidebar:
                 })
             st.rerun()
 
-# Update the constants based on session state
+
 USE_STREAM = st.session_state.video_settings['use_stream']
 ENABLE_FPS_SYNC = st.session_state.video_settings['enable_fps_sync']
 THREADS = st.session_state.video_settings['threads']
@@ -489,7 +436,6 @@ BUFFER_SIZE = st.session_state.video_settings['buffer_size']
 DISPLAY_DELAY = 1.0 / st.session_state.video_settings['target_fps']
 PREDICTION_REUSE_FRAMES = st.session_state.video_settings['prediction_reuse_frames']
 
-# Add performance metrics display
 if st.session_state.get('processing_stats'):
     st.sidebar.subheader("Performance Metrics")
     stats = st.session_state.processing_stats
@@ -501,7 +447,7 @@ if st.session_state.get('processing_stats'):
 class VideoProcessor:
 
   def __init__(self, model_url, video_url, pat):
-    # Store video settings locally instead of accessing session state in threads
+ 
     self.video_settings = {
         'use_stream': st.session_state.video_settings.get('use_stream', False),
         'enable_fps_sync': st.session_state.video_settings.get('enable_fps_sync', True),
@@ -516,9 +462,8 @@ class VideoProcessor:
         'prediction_reuse_frames': st.session_state.video_settings.get('prediction_reuse_frames', 2)
     }
 
-    global RESIZE_SIZE  # Ensure global access
+    global RESIZE_SIZE 
 
-    # Initialize model first
     model_kwargs = {'url': model_url, 'pat': pat}
     
     if st.session_state.get("clarifai_base_url"):
@@ -528,18 +473,15 @@ class VideoProcessor:
         model_kwargs['root_certificates_path'] = st.session_state["clarifai_root_certificates_path"]
 
     self.detector_model = Model(**model_kwargs)
-
-    # Then initialize video parameters
     self.model_url = model_url
     self.video_url = video_url
     self.pat = pat
-    self.frame_width = 1920  # Default HD resolution
+    self.frame_width = 1920 
     self.frame_height = 1080
-    self.input_fps = 30  # Default FPS
+    self.input_fps = 30 
     
-    # Initialize timing variables
     self.frame_interval = 1.0 / self.input_fps
-    self.frame_interval *= 0.9  # Adjust for overhead
+    self.frame_interval *= 0.9 
     self.last_frame_time = time.time()
     self.frame_times = []
     self.target_frame_time = 1.0 / st.session_state.video_settings.get('target_fps', 30)
@@ -550,7 +492,6 @@ class VideoProcessor:
         logger.error(f"[ERROR] Invalid RESIZE_SIZE format: {RESIZE_SIZE}. Using default (1.0, 1.0)")
         self.resize_size = (1.0, 1.0)
 
-    # Initialize other attributes
     self.frame_counter = 0
     self.stop_processing = False
     self.lock = threading.Lock()
@@ -560,11 +501,7 @@ class VideoProcessor:
     self.predict_queue = Queue()
     self.decoded_frames = {}
     self.executor = futures.ThreadPoolExecutor(max_workers=THREADS)
-    
-    # Determine if using FFmpeg (RTSP/UDP) or OpenCV (MP4)
     self.use_ffmpeg = self.video_url.startswith(("rtsp://", "udp://"))
-    
-    # Initialize video capture
     if self.video_url.startswith("udp://"):
         self._init_udp_stream()
     else:
@@ -573,26 +510,20 @@ class VideoProcessor:
   def _init_udp_stream(self):
     ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
     logger.info(f"[INFO] Using FFmpeg path: {ffmpeg_path}")
-    
     ffmpeg_cmd = [
-        ffmpeg_path,
-        "-fflags", "nobuffer",
-        "-probesize", "32",
-        "-analyzeduration", "0",
-        "-i", self.video_url,
-        "-flags", "low_delay",
-        "-strict", "experimental",
-        "-vf", f"scale={self.frame_width}:{self.frame_height},format=bgr24",
-        "-f", "image2pipe",
-        "-pix_fmt", "bgr24",
-        "-vcodec", "rawvideo",
-        "-reorder_queue_size", "0",
-        "-tune", "zerolatency",
-        "-"
-    ]
-    
+        ffmpeg_path, 
+        "-i", self.video_url, 
+        "-fflags", "nobuffer", 
+        "-flags", "low_delay", 
+        "-strict", "experimental", 
+        "-vf", f"scale={self.frame_width}:{self.frame_height},format=bgr24", 
+        "-f", "image2pipe", 
+        "-pix_fmt", "bgr24", 
+        "-vcodec", "rawvideo", 
+        "-loglevel", "verbose", 
+        "-"]
     logger.info(f"[INFO] UDP FFmpeg command: {' '.join(ffmpeg_cmd)}")
-    
+    print(f"[DEBUG] FFmpeg command: {' '.join(ffmpeg_cmd)}")
     try:
         self.ffmpeg_process = subprocess.Popen(
             ffmpeg_cmd,
@@ -604,7 +535,7 @@ class VideoProcessor:
         self.frame_size = self.frame_width * self.frame_height * 3
         logger.info(f"[INFO] Frame size calculated: {self.frame_size} bytes")
         self.last_frame_time = time.time()
-        self.frame_interval = 1.0 / 30.0  # Force 30fps for UDP
+        self.frame_interval = 1.0 / 30.0  
         
     except Exception as e:
         logger.error(f"[ERROR] Failed to initialize UDP stream: {str(e)}")
@@ -616,7 +547,6 @@ class VideoProcessor:
     self.cap = cv2.VideoCapture(self.video_url)
     if not self.cap.isOpened():
         logger.info("[INFO] OpenCV capture failed, falling back to FFmpeg")
-        # RTSP/HTTP handling with FFmpeg
         try:
             ffmpeg_path = imageio_ffmpeg.get_ffmpeg_exe()
             probe_cmd = [
@@ -642,8 +572,6 @@ class VideoProcessor:
             "-vcodec", "rawvideo",
             "-"
         ]
-
-        # Start FFmpeg process
         self.ffmpeg_process = subprocess.Popen(
             ffmpeg_cmd,
             stdout=subprocess.PIPE,
@@ -651,25 +579,22 @@ class VideoProcessor:
             bufsize=10**8
         )
 
-        # Calculate frame size
-        self.frame_size = self.frame_width * self.frame_height * 3  # 3 bytes per pixel (BGR)
-        self.use_ffmpeg = True  # Switch to FFmpeg mode
+        self.frame_size = self.frame_width * self.frame_height * 3
+        self.use_ffmpeg = True  
     else:
-        # Get video properties from OpenCV
         self.frame_width = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         self.frame_height = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         self.input_fps = self.cap.get(cv2.CAP_PROP_FPS)
         logger.info(f"[INFO] OpenCV capture initialized: {self.frame_width}x{self.frame_height} @ {self.input_fps}fps")
     
-    # Set frame interval for playback synchronization
-    self.frame_interval = 1.0 / self.input_fps if self.input_fps > 0 else DISPLAY_DELAY
-    self.frame_interval *= 0.9  # Adjust to maintain FPS with Streamlit overhead
 
-    # Add frame timing variables
+    self.frame_interval = 1.0 / self.input_fps if self.input_fps > 0 else DISPLAY_DELAY
+    self.frame_interval *= 0.9  
+
     self.last_frame_time = time.time()
     self.frame_times = []
-    self.target_frame_time = 1.0 / 30.0  # Target 30 FPS
-    self.stats_update_interval = 0.5  # Update stats every 0.5 seconds
+    self.target_frame_time = 1.0 / 30.0  
+    self.stats_update_interval = 0.5 
     self.last_stats_update = time.time()
 
 
@@ -679,7 +604,6 @@ class VideoProcessor:
       return None, None
     
     try:
-      # Basic resize without color conversion
       height, width = frame.shape[:2]
       target_width = int(width * RESIZE_SIZE[0])
       target_height = int(height * RESIZE_SIZE[1])
@@ -687,17 +611,15 @@ class VideoProcessor:
       resized_frame = cv2.resize(frame, (target_width, target_height), 
                                  interpolation=cv2.INTER_LINEAR)
 
-      # Convert frame to bytes
       _, img_encoded = cv2.imencode('.jpg', resized_frame)
       img_bytes = img_encoded.tobytes()
 
-      # Create input using Clarifai's Input class with input_id
       input_proto = Inputs.get_input_from_bytes(
-        input_id=f"frame_{frame_num}",  # Create unique ID for each frame
+        input_id=f"frame_{frame_num}",  
         image_bytes=img_bytes
       )
       
-      return input_proto, frame  # Return original frame for display
+      return input_proto, frame  
       
     except Exception as e:
       print(f"[ERROR] Frame preparation failed: {str(e)}")
@@ -720,13 +642,11 @@ class VideoProcessor:
         bbox_thickness = max(1, int(2 * thickness_factor))
         font_scale = max(0.4, min(1.2, 0.5 * thickness_factor))
 
-        # Access first output's regions
         if predictions and predictions.outputs:
             regions = predictions.outputs[0].data.regions
             for region in regions:
                 try:
                     bbox = region.region_info.bounding_box
-                    
                     x1 = int(bbox.left_col * new_width)
                     y1 = int(bbox.top_row * new_height)
                     x2 = int(bbox.right_col * new_width)
@@ -878,7 +798,6 @@ class VideoProcessor:
                 if not self.decoded_frames:
                     time.sleep(0.001)
                     continue
-                
                 current_frame = min(self.decoded_frames.keys())
                 fut, frame = self.decoded_frames.pop(current_frame)
             
@@ -899,13 +818,11 @@ class VideoProcessor:
             if ENABLE_DRAW_PREDICTIONS and self.last_prediction:
                 display_frame = self.draw_predictions(display_frame, self.last_prediction, current_frame, fps)
             
-            if not self.use_ffmpeg:
+            if self.use_ffmpeg:
                 display_frame = cv2.cvtColor(display_frame, cv2.COLOR_BGR2RGB)
-            
             frame_placeholder.image(display_frame, channels="RGB", use_container_width=True)
             last_display_time = current_time
-            
-            # Update stats
+          
             st.session_state.processing_stats = {
                 'fps': fps,
                 'processing_ms': (time.time() - current_time) * 1000,
@@ -922,7 +839,6 @@ class VideoProcessor:
       self.executor.shutdown(wait=False)
 
 
-# Handle button actions
 if start_button:
     try:
         st.session_state.selected_model = selected_model_url["URL"]
@@ -930,15 +846,13 @@ if start_button:
         
         status_placeholder = st.empty()
         status_placeholder.info("Initializing video processor...")
-        
-        # Create processor instance with proper initialization
+      
         processor = VideoProcessor(
             st.session_state.selected_model,
             st.session_state.selected_video,
             pat
         )
         
-        # Explicitly set required attributes
         processor.stop_processing = False
         processor.lock = threading.Lock()
         processor.frame_counter = 0
@@ -949,9 +863,8 @@ if start_button:
         processor.predict_queue = Queue()
         processor.decoded_frames = {}
         processor.executor = futures.ThreadPoolExecutor(max_workers=THREADS)
-        
-        # Add target frame time based on FPS settings
-        target_fps = st.session_state.video_settings.get('target_fps', 30)  # Default to 30 if not set
+
+        target_fps = st.session_state.video_settings.get('target_fps', 30)  
         processor.target_frame_time = 1.0 / target_fps
         
         st.session_state.processor = processor
@@ -1003,5 +916,5 @@ if exit_button:
     st.success("Exited to the Video Selection page.")
     st.switch_page("pages/1_Video_Selection.py")
 
-# Footer
+
 footer(st)
