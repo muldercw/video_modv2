@@ -1,0 +1,9 @@
+[theme]
+base="light"
+primaryColor="#356dff"
+
+[client]
+showSidebarNavigation = false
+
+[logger]
+level = "error"
